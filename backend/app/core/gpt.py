@@ -48,3 +48,14 @@ async def summarize_insights(payload: dict) -> GPTSummaryResponse:
     """
     # Placeholder: Add GPT summary logic here
     return GPTSummaryResponse(summary="Summary generation not yet implemented.", result=None)
+
+# --- New for basic stats summary ---
+
+def summarize_with_gpt(stats: dict) -> str:
+    """
+    Call GPT to explain the dataset summary in plain English.
+    """
+    prompt = f"Explain this dataset summary in plain English: {stats}"
+    # Assume call_gpt_api(prompt) is available and returns a string
+    from app.core.gpt import call_gpt_api  # If not already imported
+    return call_gpt_api(prompt)
