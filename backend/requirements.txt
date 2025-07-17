@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-multipart
+pandas
+numpy
+boto3
+openai
+python-dotenv
+pydantic
+aiofiles
