@@ -11,7 +11,7 @@ from app.utils.parsers import parse_dataframe_from_bytes, parse_dataframe_from_p
 import os
 from typing import Optional
 
-UPLOADS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../uploads'))
+UPLOADS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../uploads'))
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 router = APIRouter()
