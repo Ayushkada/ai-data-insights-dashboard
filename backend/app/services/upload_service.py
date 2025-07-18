@@ -11,7 +11,7 @@ from typing import Tuple, Optional, Dict, Any
 from app.utils.helpers import get_file_extension, is_supported_extension
 from app.utils.session_cache import SessionCache
 from app.core.gpt import summarize_with_gpt
-from app.services.statistics.analyze_statistics import compute_basic_statistics
+from app.services.analyze_statistics import compute_basic_statistics
 
 async def download_and_validate_file(url: str) -> Tuple[Optional[bytes], dict]:
     """
@@ -85,8 +85,8 @@ def save_session_df_to_uploads(session_id: str, uploads_dir: str, title: str = N
                     raise Exception("A dataset with the same content already exists.")
                 if title and meta.get("title") == title:
                     raise Exception("A dataset with the same title already exists.")
-            except Exception:
-                pass
+            except json.JSONDecodeError:
+                continue
 
     filename = f"{uuid.uuid4()}.csv"
     file_path = os.path.join(uploads_dir, filename)
