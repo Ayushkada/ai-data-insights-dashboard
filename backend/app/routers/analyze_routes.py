@@ -1,10 +1,13 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from app.schemas.statistics import BasicStatsRequest, BasicStatsResponse
-from app.services.statistics.analyze_statistics import compute_basic_statistics
+from app.services.statistics.analyze_statistics import compute_basic_statistics, compute_skewness_kurtosis, compute_correlation_matrices
 from app.core.gpt import summarize_with_gpt
-from app.utils.helpers import get_file_extension
+from app.utils.helpers import get_file_extension, get_session_df
+from app.utils.session_cache import SessionCache
 import pandas as pd
 import os
+
+from app.utils.parsers import DataFrameParseError, parse_dataframe_from_path
 
 router = APIRouter()
 
@@ -53,27 +56,29 @@ async def analyze_automl():
     return {"message": "AutoML not yet implemented."}
 
 @router.post("/basic", response_model=BasicStatsResponse)
-async def analyze_basic_stats(request: BasicStatsRequest):
+async def analyze_basic_stats(request: BasicStatsRequest, fastapi_request: Request):
     """
-    Compute basic descriptive statistics for a dataset. Optionally include a GPT summary.
-    Supports .csv, .tsv, and .xlsx files.
+    Compute basic descriptive statistics for the current session DataFrame.
+    Only works if DataFrame is in session cache.
     """
-    file_path = request.file_path
-    abs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../uploads', file_path))
-    if not os.path.exists(abs_path):
-        raise HTTPException(status_code=404, detail="File not found.")
-    ext = get_file_extension(abs_path)
-    try:
-        if ext == ".csv":
-            df = pd.read_csv(abs_path)
-        elif ext == ".tsv":
-            df = pd.read_csv(abs_path, sep='\t')
-        elif ext == ".xlsx":
-            df = pd.read_excel(abs_path)
-        else:
-            raise HTTPException(status_code=400, detail=f"Unsupported file extension: {ext}")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to load file: {e}")
-
+    df = get_session_df(fastapi_request)
     stats = compute_basic_statistics(df)
-    return BasicStatsResponse(stats=stats) 
+    return BasicStatsResponse(stats=stats)
+
+@router.post("/skewness-kurtosis")
+async def analyze_skewness_kurtosis(fastapi_request: Request):
+    """
+    Return skewness and kurtosis for all numeric columns in the session DataFrame.
+    """
+    df = get_session_df(fastapi_request)
+    result = compute_skewness_kurtosis(df)
+    return result
+
+@router.post("/correlation")
+async def analyze_correlation(fastapi_request: Request):
+    """
+    Return correlation matrices (Pearson, Spearman, Cramér’s V) and top correlated pairs for the session DataFrame.
+    """
+    df = get_session_df(fastapi_request)
+    result = compute_correlation_matrices(df)
+    return result
