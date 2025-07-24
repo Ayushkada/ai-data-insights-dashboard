@@ -1,6 +1,9 @@
 # backend/app/utils/helpers.py
 
+from typing import Any, Dict
 from urllib.parse import urlparse
+
+import pandas as pd
 from fastapi import Request, HTTPException
 from app.utils.session_cache import SessionCache
 
@@ -54,3 +57,14 @@ def get_session_df(request: Request):
             detail="No dataset found in session. Please upload or select a dataset first."
         )
     return df
+
+
+def get_dataframe_preview(df: pd.DataFrame, max_cols: int = 50, sample_rows: int = 5) -> Dict[str, Any]:
+    columns = list(df.columns)[:max_cols]
+    sample = (
+        df[columns]
+        .head(sample_rows)
+        .where(pd.notnull(df[columns]), None)
+        .to_dict(orient="records")
+    )
+    return {"columns": columns, "sample_rows": sample}

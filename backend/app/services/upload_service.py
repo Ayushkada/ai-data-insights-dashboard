@@ -7,11 +7,12 @@ import aiohttp
 import pandas as pd
 import json
 from datetime import datetime
-from typing import Tuple, Optional, Dict, Any
-from app.utils.helpers import get_file_extension, is_supported_extension
+from typing import Tuple, Optional
+from app.utils.helpers import get_dataframe_preview, get_file_extension, is_supported_extension
 from app.utils.session_cache import SessionCache
 from app.core.gpt import summarize_with_gpt
 from app.services.analyze_statistics import compute_basic_statistics
+
 
 async def download_and_validate_file(url: str) -> Tuple[Optional[bytes], dict]:
     """
@@ -26,7 +27,9 @@ async def download_and_validate_file(url: str) -> Tuple[Optional[bytes], dict]:
             if resp.status != 200:
                 return None, {"error": f"File not reachable (HTTP {resp.status})"}
             content_type = resp.headers.get("Content-Type", "")
-            if not any(t in content_type for t in ["csv", "tsv", "excel", "spreadsheet"]):
+            if not any(
+                t in content_type for t in ["csv", "tsv", "excel", "spreadsheet"]
+            ):
                 return None, {"error": f"Unsupported content-type: {content_type}"}
             data = await resp.read()
             filename = url.split("/")[-1]
@@ -38,33 +41,40 @@ async def download_and_validate_file(url: str) -> Tuple[Optional[bytes], dict]:
             }
             return data, meta
 
+
 def list_datasets_with_summaries(uploads_dir: str) -> list:
     """
     Return list of datasets in uploads folder with their summary metadata.
     """
     datasets = []
     for fname in os.listdir(uploads_dir):
-        if fname.endswith(('.csv', '.tsv', '.xlsx')):
+        if fname.endswith((".csv", ".tsv", ".xlsx")):
             base = os.path.splitext(fname)[0]
             summary_path = os.path.join(uploads_dir, f"{base}.summary.json")
             meta = {"filename": fname}
             if os.path.exists(summary_path):
                 try:
-                    with open(summary_path, 'r') as f:
+                    with open(summary_path, "r") as f:
                         meta.update(json.load(f))
                 except Exception:
                     pass
             meta["size"] = os.path.getsize(os.path.join(uploads_dir, fname))
-            meta["created_at"] = datetime.fromtimestamp(os.path.getctime(os.path.join(uploads_dir, fname))).isoformat()
+            meta["created_at"] = datetime.fromtimestamp(
+                os.path.getctime(os.path.join(uploads_dir, fname))
+            ).isoformat()
             datasets.append(meta)
     return datasets
+
 
 def get_df_hash(df):
     """Generate a SHA256 hash of the DataFrame's CSV content."""
     csv_bytes = df.to_csv(index=False).encode("utf-8")
     return hashlib.sha256(csv_bytes).hexdigest()
 
-def save_session_df_to_uploads(session_id: str, uploads_dir: str, title: str = None) -> dict:
+
+def save_session_df_to_uploads(
+    session_id: str, uploads_dir: str, title: str = None
+) -> dict:
     """
     Persist the DataFrame in the session cache to uploads folder, generate GPT summary, and save metadata JSON.
     Prevents duplicates by content (hash) or title.
@@ -77,9 +87,9 @@ def save_session_df_to_uploads(session_id: str, uploads_dir: str, title: str = N
 
     # Duplicate check (by hash or title)
     for fname in os.listdir(uploads_dir):
-        if fname.endswith('.summary.json'):
+        if fname.endswith(".summary.json"):
             try:
-                with open(os.path.join(uploads_dir, fname), 'r') as f:
+                with open(os.path.join(uploads_dir, fname), "r") as f:
                     meta = json.load(f)
                 if meta.get("hash") == df_hash:
                     raise Exception("A dataset with the same content already exists.")
@@ -88,7 +98,8 @@ def save_session_df_to_uploads(session_id: str, uploads_dir: str, title: str = N
             except json.JSONDecodeError:
                 continue
 
-    filename = f"{uuid.uuid4()}.csv"
+    dataset_id = str(uuid.uuid4())
+    filename = f"{dataset_id}.csv"
     file_path = os.path.join(uploads_dir, filename)
     df.to_csv(file_path, index=False)
     summary = None
@@ -98,23 +109,39 @@ def save_session_df_to_uploads(session_id: str, uploads_dir: str, title: str = N
     except Exception as e:
         summary = f"Failed to generate summary: {e}"
     meta = {
+        "id": dataset_id,
         "filename": filename,
         "title": title or filename,
         "summary": summary,
         "columns": list(df.columns),
+        "num_rows": len(df), 
+        "preview": get_dataframe_preview(df),
         "size": os.path.getsize(file_path),
         "created_at": datetime.now().isoformat(),
-        "hash": df_hash  
+        "hash": df_hash,
     }
-    summary_path = os.path.join(uploads_dir, f"{os.path.splitext(filename)[0]}.summary.json")
-    with open(summary_path, 'w') as f:
+    summary_path = os.path.join(
+        uploads_dir, f"{os.path.splitext(filename)[0]}.summary.json"
+    )
+    with open(summary_path, "w") as f:
         json.dump(meta, f)
     return meta
 
-def get_dataframe_preview(df: pd.DataFrame, max_cols: int = 50, sample_rows: int = 5) -> Dict[str, Any]:
-    """
-    Create a preview dict for the given DataFrame: list of columns and sample rows.
-    """
-    columns = list(df.columns)[:max_cols]
-    sample = df[columns].head(sample_rows).to_dict(orient="records")
-    return {"columns": columns, "sample_rows": sample}
+# --- New: Helper to create DatasetMeta for session cache ---
+def create_session_dataset_meta(dataset_id: str, title: str, filename: str, df: pd.DataFrame, summary: str, created_at: str, size: int, df_hash: str) -> dict:
+    return {
+        "id": dataset_id,
+        "title": title or filename,
+        "filename": filename,
+        "columns": list(df.columns),
+        "preview": get_dataframe_preview(df),
+        "created_at": created_at,
+        "summary": summary,
+        "num_rows": len(df),
+        "size": size,
+        "hash": df_hash,
+    }
+
+# --- New: Add dataset to session cache (enforce max 3) ---
+def add_dataset_to_session(session_id: str, meta: dict):
+    SessionCache.add_dataset_meta(session_id, meta)

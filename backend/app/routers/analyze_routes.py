@@ -3,6 +3,7 @@ from app.schemas.statistics import BasicStatsRequest, BasicStatsResponse
 from app.services.analyze_statistics import compute_basic_statistics, compute_skewness_kurtosis, compute_correlation_matrices
 from app.core.gpt import summarize_with_gpt
 from app.utils.helpers import get_session_df
+from app.utils.session_cache import SessionCache
 
 router = APIRouter()
 
@@ -55,9 +56,21 @@ async def analyze_basic_stats(request: BasicStatsRequest, fastapi_request: Reque
     """
     Compute basic descriptive statistics for the current session DataFrame.
     Only works if DataFrame is in session cache.
+    Caches result per session and dataset in Redis.
     """
+    session_id = getattr(fastapi_request.state, "session_id", None)
+    dataset_id = getattr(request, "dataset_id", None) or getattr(request, "id", None) or None
+    if not dataset_id:
+        raise Exception("dataset_id is required in the request body.")
+    # Try to get from cache
+    cached = SessionCache.get_analysis_result(session_id, dataset_id, "basic_stats")
+    if cached:
+        return BasicStatsResponse(stats=cached["stats"], gpt_summary=cached.get("gpt_summary"))
     df = get_session_df(fastapi_request)
     stats = compute_basic_statistics(df)
+    # Optionally, add GPT summary here if needed
+    result = {"stats": stats}
+    SessionCache.set_analysis_result(session_id, dataset_id, "basic_stats", result)
     return BasicStatsResponse(stats=stats)
 
 @router.post("/skewness-kurtosis")

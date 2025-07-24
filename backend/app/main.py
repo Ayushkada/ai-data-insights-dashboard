@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-from app.routers import analyze_routes, gpt_routes, upload_routes, profile_routes
+from app.routers import analyze_routes, gpt_routes, upload_routes
 from app.utils.session_middleware import SessionMiddleware
 import redis
 import os
@@ -17,7 +17,6 @@ app.add_middleware(SessionMiddleware)
 app.include_router(analyze_routes.router, prefix="/analyze", tags=["Analysis"])
 app.include_router(gpt_routes.router, prefix="/gpt", tags=["GPT Orchestration"])
 app.include_router(upload_routes.router, prefix="/upload", tags=["File Uploads"])
-app.include_router(profile_routes.router, prefix="/profile", tags=["Profile"])
 
 @app.get("/health", tags=["Health"])
 async def health_check():
