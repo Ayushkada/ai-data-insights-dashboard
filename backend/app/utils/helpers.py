@@ -59,7 +59,7 @@ def get_session_df(request: Request):
     return df
 
 
-def get_dataframe_preview(df: pd.DataFrame, max_cols: int = 50, sample_rows: int = 5) -> Dict[str, Any]:
+def get_dataframe_preview(df: pd.DataFrame, max_cols: int = 50, sample_rows: int = 10) -> Dict[str, Any]:
     columns = list(df.columns)[:max_cols]
     sample = (
         df[columns]

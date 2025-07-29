@@ -48,3 +48,7 @@ class DatasetMetaList(BaseModel):
 
 class RemoveDatasetRequest(BaseModel):
     id: str  # Dataset id to remove 
+
+class SessionDatasetDataResponse(BaseModel):
+    columns: List[str]
+    rows: List[Dict[str, Any]] 

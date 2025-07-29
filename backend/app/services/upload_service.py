@@ -41,6 +41,65 @@ async def download_and_validate_file(url: str) -> Tuple[Optional[bytes], dict]:
             }
             return data, meta
 
+def save_session_dataset_to_uploads(
+    session_id: str,
+    dataset_id: str,
+    uploads_dir: str,
+    title: str = None
+) -> dict:
+    """
+    Save the dataset with dataset_id from session to uploads folder and generate summary JSON.
+    Prevents duplicates by content (hash) or title in uploads.
+    """
+    # Fetch DataFrame and meta
+    df = SessionCache.get_dataset_data(session_id, dataset_id)
+    meta = SessionCache.get_dataset_meta(session_id, dataset_id)
+    if df is None or meta is None:
+        raise Exception("Dataset not found in session.")
+
+    df_hash = meta.get("hash") or hashlib.sha256(df.to_csv(index=False).encode("utf-8")).hexdigest()
+    # Check for duplicate in uploads dir
+    for fname in os.listdir(uploads_dir):
+        if fname.endswith(".summary.json"):
+            try:
+                with open(os.path.join(uploads_dir, fname), "r") as f:
+                    exist_meta = json.load(f)
+                if exist_meta.get("hash") == df_hash:
+                    raise Exception("A dataset with the same content already exists in uploads.")
+                if title and exist_meta.get("title") == title:
+                    raise Exception("A dataset with the same title already exists in uploads.")
+            except Exception:
+                continue
+
+    # Use the provided title if given, else keep old
+    filename = f"{dataset_id}.csv"
+    file_path = os.path.join(uploads_dir, filename)
+    df.to_csv(file_path, index=False)
+    try:
+        stats = compute_basic_statistics(df)
+        summary = summarize_with_gpt(stats)
+    except Exception as e:
+        summary = f"Failed to generate summary: {e}"
+
+    new_meta = {
+        "id": dataset_id,
+        "filename": filename,
+        "title": title or meta.get("title") or filename,
+        "summary": summary,
+        "columns": list(df.columns),
+        "num_rows": len(df),
+        "preview": get_dataframe_preview(df),
+        "size": os.path.getsize(file_path),
+        "created_at": datetime.now().isoformat(),
+        "hash": df_hash,
+    }
+    summary_path = os.path.join(
+        uploads_dir, f"{os.path.splitext(filename)[0]}.summary.json"
+    )
+    with open(summary_path, "w") as f:
+        json.dump(new_meta, f)
+    return new_meta
+
 
 def list_datasets_with_summaries(uploads_dir: str) -> list:
     """
@@ -67,67 +126,9 @@ def list_datasets_with_summaries(uploads_dir: str) -> list:
 
 
 def get_df_hash(df):
-    """Generate a SHA256 hash of the DataFrame's CSV content."""
     csv_bytes = df.to_csv(index=False).encode("utf-8")
     return hashlib.sha256(csv_bytes).hexdigest()
 
-
-def save_session_df_to_uploads(
-    session_id: str, uploads_dir: str, title: str = None
-) -> dict:
-    """
-    Persist the DataFrame in the session cache to uploads folder, generate GPT summary, and save metadata JSON.
-    Prevents duplicates by content (hash) or title.
-    """
-    df = SessionCache.get_df(session_id)
-    if df is None:
-        raise Exception("No DataFrame in session cache.")
-
-    df_hash = get_df_hash(df)
-
-    # Duplicate check (by hash or title)
-    for fname in os.listdir(uploads_dir):
-        if fname.endswith(".summary.json"):
-            try:
-                with open(os.path.join(uploads_dir, fname), "r") as f:
-                    meta = json.load(f)
-                if meta.get("hash") == df_hash:
-                    raise Exception("A dataset with the same content already exists.")
-                if title and meta.get("title") == title:
-                    raise Exception("A dataset with the same title already exists.")
-            except json.JSONDecodeError:
-                continue
-
-    dataset_id = str(uuid.uuid4())
-    filename = f"{dataset_id}.csv"
-    file_path = os.path.join(uploads_dir, filename)
-    df.to_csv(file_path, index=False)
-    summary = None
-    try:
-        stats = compute_basic_statistics(df)
-        summary = summarize_with_gpt(stats)
-    except Exception as e:
-        summary = f"Failed to generate summary: {e}"
-    meta = {
-        "id": dataset_id,
-        "filename": filename,
-        "title": title or filename,
-        "summary": summary,
-        "columns": list(df.columns),
-        "num_rows": len(df), 
-        "preview": get_dataframe_preview(df),
-        "size": os.path.getsize(file_path),
-        "created_at": datetime.now().isoformat(),
-        "hash": df_hash,
-    }
-    summary_path = os.path.join(
-        uploads_dir, f"{os.path.splitext(filename)[0]}.summary.json"
-    )
-    with open(summary_path, "w") as f:
-        json.dump(meta, f)
-    return meta
-
-# --- New: Helper to create DatasetMeta for session cache ---
 def create_session_dataset_meta(dataset_id: str, title: str, filename: str, df: pd.DataFrame, summary: str, created_at: str, size: int, df_hash: str) -> dict:
     return {
         "id": dataset_id,
@@ -142,6 +143,5 @@ def create_session_dataset_meta(dataset_id: str, title: str, filename: str, df: 
         "hash": df_hash,
     }
 
-# --- New: Add dataset to session cache (enforce max 3) ---
-def add_dataset_to_session(session_id: str, meta: dict):
-    SessionCache.add_dataset_meta(session_id, meta)
+def add_dataset_to_session(session_id: str, dataset_id: str, meta: dict, df: pd.DataFrame):
+    SessionCache.add_dataset(session_id, dataset_id, meta, df)
