@@ -1,6 +1,6 @@
 // upload.api.ts
 
-import type { DatasetMeta, UrlUploadResponse, DatasetSummary } from "./types"
+import type { DatasetMeta, UrlUploadResponse, DatasetSummary, DatasetFullResponse } from "./types"
 import { baseFetch } from "@/app/common/baseFetch.api"
 
 // Get all datasets in global uploads directory
@@ -81,20 +81,11 @@ export async function getSessionDatasets(): Promise<DatasetMeta[]> {
 }
 
 // Get full dataset info (meta, preview, analyses, first 500 rows) for a session dataset
-export interface DatasetFullResponse {
-  meta: DatasetMeta
-  data: {
-    columns: string[]
-    rows: any[]
-  }
-  analyses: Record<string, any>
-}
-
 export async function getSessionDatasetFull(datasetId: string): Promise<DatasetFullResponse> {
   try {
     return await baseFetch<DatasetFullResponse>(`/api/upload/session-dataset/${datasetId}/full`)
   } catch (err: any) {
-    throw new Error(`Failed to fetch dataset details: ${err.message}`)
+    throw err.message
   }
 }
 

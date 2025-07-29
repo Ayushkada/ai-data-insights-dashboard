@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation"
 import { uploadDataset, uploadDatasetByUrl } from "@/app/upload/upload.api"
 import { parseCsvOrTsv, parseExcel, parseUrlCsv } from "@/lib/parser"
 import { DatasetPreviewTable } from "./ui/dataset-preview-table"
+import { useSessionDatasets } from "@/lib/data-provider"
 
 const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -18,6 +19,7 @@ const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 export function UploadSection() {
   const { toast } = useToast()
   const router = useRouter();
+  const sessionDatasets = useSessionDatasets();
 
   const [file, setFile] = useState<File | null>(null)
   const [datasetUrl, setDatasetUrl] = useState<string>("")
@@ -79,6 +81,8 @@ export function UploadSection() {
       setDatasetUrl("")
       setPreview({ rows: null, columns: null })
       setTitle("")
+      // Refresh session datasets so Navbar updates
+      sessionDatasets?.refresh?.();
       toast({
         title: "Dataset uploaded!",
         description: "Your dataset was uploaded and is ready for analysis.",

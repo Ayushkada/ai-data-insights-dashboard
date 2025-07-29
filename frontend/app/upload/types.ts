@@ -40,3 +40,12 @@ export interface FilePreview {
   
   export type UploadMode = "upload" | "link" | "select"
   
+
+  export interface DatasetFullResponse {
+    meta: DatasetMeta
+    data: {
+      columns: string[]
+      rows: any[]
+    }
+    analyses: Record<string, any>
+  }

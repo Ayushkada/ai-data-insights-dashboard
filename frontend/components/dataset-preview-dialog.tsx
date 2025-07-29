@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast"
 import { selectDataset, getSessionDatasets } from "@/app/upload/upload.api"
 import { useRouter } from "next/navigation"
 import { DatasetPreviewTable } from "./ui/dataset-preview-table"
+import { useSessionDatasets } from "@/lib/data-provider"
 
 interface DatasetPreviewDialogProps {
     open: boolean
@@ -39,13 +40,14 @@ export const DatasetPreviewDialog: React.FC<DatasetPreviewDialogProps> = ({
     const router = useRouter();
     const [error, setError] = React.useState<string | null>(null);
     const [loading, setLoading] = React.useState(false);
+    const sessionDatasets = useSessionDatasets();
 
     const addDataset = async () => {
         setError(null);
         setLoading(true);
         try {
-            const sessionDatasets = await getSessionDatasets();
-            const existingDataset = sessionDatasets.find(ds => ds.filename === filename);
+            const sessionDatasetsList = await getSessionDatasets();
+            const existingDataset = sessionDatasetsList.find(ds => ds.filename === filename);
             if (existingDataset) {
                 toast({
                     title: "Dataset found!",
@@ -53,11 +55,15 @@ export const DatasetPreviewDialog: React.FC<DatasetPreviewDialogProps> = ({
                     variant: "default",
                 });
                 onClose();
+                // Refresh session datasets so Navbar updates
+                sessionDatasets?.refresh?.();
                 router.push(`datasets/${existingDataset.id}`);
                 return;
             }
             // Always let the backend handle duplicate logic
             const response = await selectDataset(filename);
+            // Refresh session datasets so Navbar updates
+            sessionDatasets?.refresh?.();
             toast({
                 title: "Dataset selected!",
                 description: "Your dataset is now active in your session.",
