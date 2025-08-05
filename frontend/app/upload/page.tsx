@@ -1,54 +1,18 @@
-"use client"
-
 import { UploadSection } from "@/components/upload-section"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { DatasetGrid } from "@/components/dataset-grid"
-import { useState } from "react"
-import { useEffect } from "react"
-import { Button } from "@/components/ui/button"
+import { UploadHeader } from "@/components/upload-header"
 
-async function getSessionDatasets() {
-  const res = await fetch("/api/upload/session-datasets");
-  if (!res.ok) throw new Error("Failed to fetch session datasets");
-  return (await res.json()).datasets;
-}
-
-async function removeSessionDataset(id: string) {
-  await fetch("/api/upload/remove-session-dataset", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id }),
-  });
-}
-
-export default function UploadPage() {
-  const [removing, setRemoving] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  const handleRemoveAll = async () => {
-    setRemoving(true);
-    try {
-      const datasets = await getSessionDatasets();
-      await Promise.all(datasets.map((d: any) => removeSessionDataset(d.id)));
-      setRefreshKey(k => k + 1);
-    } catch (e) {
-      // Optionally handle error
-    }
-    setRemoving(false);
-  };
-
-  return (
-    <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-8">
-          <UploadSection />
-          <DatasetGrid key={refreshKey} />
-          <div className="flex justify-end">
-            <Button onClick={handleRemoveAll} disabled={removing} variant="destructive">
-              {removing ? "Removing..." : "Remove All Session Datasets"}
-            </Button>
-          </div>
-        </div>
-      </main>
-    </div>
-  )
+export default function Upload() {
+    return (
+        <SidebarProvider>
+            <SidebarInset>
+                <UploadHeader />
+                <main className="flex-1 overflow-hidden bg-gradient-to-br from-gray-50/50 via-white to-indigo-50/30 dark:from-gray-950/50 dark:via-gray-900 dark:to-indigo-950/30">
+                    <UploadSection />
+                    <DatasetGrid />
+                </main>
+            </SidebarInset>
+        </SidebarProvider>
+    )
 }

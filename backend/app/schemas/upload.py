@@ -1,54 +1,38 @@
-from pydantic import BaseModel, HttpUrl, Field
+from pydantic import BaseModel, HttpUrl, Field, constr
 from typing import List, Optional, Dict, Any, Literal
+from datetime import datetime
+from .shared import PaginatedResponse, PaginatedData
 
 class UrlUploadRequest(BaseModel):
-    url: HttpUrl = Field(..., description="Publicly accessible file URL from an approved domain.")
-
-class FilePreview(BaseModel):
-    columns: List[str]
-    sample_rows: List[Dict[str, Any]]
+    """Request to upload dataset from URL."""
+    url: HttpUrl = Field(..., description="Publicly accessible file URL")
+    title: Optional[str] = Field(None, description="User-provided title")
 
 class UrlUploadResponse(BaseModel):
-    id: str
-    filename: str
-    size: int
-    mime_type: str
-    preview: Optional[FilePreview] = None
-    message: Optional[str] = None
-
-class DatasetSummary(BaseModel):
-    filename: str
-    title: Optional[str] = None
-    summary: Optional[str] = None
-    columns: Optional[List[str]] = None
-    size: Optional[int] = None
-    preview: Optional[FilePreview] = None
-    num_rows: Optional[int] = None
-    created_at: Optional[str] = None
-
-class DatasetSummaryList(BaseModel):
-    datasets: List[DatasetSummary]
-
-
-
-class DatasetMeta(BaseModel):
-    id: str
-    title: Optional[str] = None
-    filename: str
-    columns: Optional[List[str]] = None
-    preview: Optional[FilePreview] = None
-    created_at: Optional[str] = None
-    summary: Optional[str] = None
-    num_rows: Optional[int] = None
-    size: Optional[int] = None
-    hash: Optional[str] = None
-
-class DatasetMetaList(BaseModel):
-    datasets: List[DatasetMeta]
+    """Response after successful URL upload."""
+    filename: str = Field(..., description="Original filename")
+    title: Optional[str] = Field(None, description="User-provided title")
+    created_at: datetime = Field(..., description="Upload timestamp")
+    size: int = Field(..., description="File size in bytes")
+    num_rows: Optional[int] = Field(None, description="Total number of rows")
+    columns: Optional[List[str]] = Field(None, description="List of column names")
+    preview: Optional[Any] = Field(None, description="Data preview")
+    summary: Optional[str] = Field(None, description="GPT-generated summary")
+    mime_type: str = Field(..., description="File MIME type")
+    message: Optional[str] = Field(None, description="Processing message")
 
 class RemoveDatasetRequest(BaseModel):
-    id: str  # Dataset id to remove 
+    """Request to remove dataset from session."""
+    # id: str = Field(..., description="Dataset ID to remove")
+    pass
 
-class SessionDatasetDataResponse(BaseModel):
-    columns: List[str]
-    rows: List[Dict[str, Any]] 
+class SessionUploadMode(BaseModel):
+    """Upload mode configuration."""
+    mode: Literal["upload", "link", "select"] = Field(
+        ...,
+        description="Upload mode: direct upload, URL, or select existing"
+    )
+    title: Optional[constr(min_length=1, max_length=100)] = Field(
+        None,
+        description="Optional dataset title"
+    ) 

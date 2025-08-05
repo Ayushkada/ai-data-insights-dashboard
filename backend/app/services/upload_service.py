@@ -10,8 +10,6 @@ from datetime import datetime
 from typing import Tuple, Optional
 from app.utils.helpers import get_dataframe_preview, get_file_extension, is_supported_extension
 from app.utils.session_cache import SessionCache
-from app.core.gpt import summarize_with_gpt
-from app.services.analyze_statistics import compute_basic_statistics
 
 
 async def download_and_validate_file(url: str) -> Tuple[Optional[bytes], dict]:
@@ -43,17 +41,16 @@ async def download_and_validate_file(url: str) -> Tuple[Optional[bytes], dict]:
 
 def save_session_dataset_to_uploads(
     session_id: str,
-    dataset_id: str,
     uploads_dir: str,
     title: str = None
 ) -> dict:
     """
-    Save the dataset with dataset_id from session to uploads folder and generate summary JSON.
+    Save the dataset from session to uploads folder and generate summary JSON.
     Prevents duplicates by content (hash) or title in uploads.
     """
     # Fetch DataFrame and meta
-    df = SessionCache.get_dataset_data(session_id, dataset_id)
-    meta = SessionCache.get_dataset_meta(session_id, dataset_id)
+    df = SessionCache.get_dataset_data(session_id)
+    meta = SessionCache.get_dataset_meta(session_id)
     if df is None or meta is None:
         raise Exception("Dataset not found in session.")
 
@@ -72,6 +69,7 @@ def save_session_dataset_to_uploads(
                 continue
 
     # Use the provided title if given, else keep old
+    dataset_id = meta.get("id")
     filename = f"{dataset_id}.csv"
     file_path = os.path.join(uploads_dir, filename)
     df.to_csv(file_path, index=False)
@@ -143,5 +141,5 @@ def create_session_dataset_meta(dataset_id: str, title: str, filename: str, df: 
         "hash": df_hash,
     }
 
-def add_dataset_to_session(session_id: str, dataset_id: str, meta: dict, df: pd.DataFrame):
-    SessionCache.add_dataset(session_id, dataset_id, meta, df)
+def add_dataset_to_session(session_id: str, meta: dict, df: pd.DataFrame):
+    SessionCache.add_dataset(session_id, meta, df)

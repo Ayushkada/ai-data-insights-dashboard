@@ -4,7 +4,7 @@ from starlette.responses import Response
 import uuid
 
 SESSION_COOKIE_NAME = "session_id"
-SESSION_COOKIE_MAX_AGE = 60 * 60 * 24  # 1 day
+SESSION_COOKIE_MAX_AGE = 60 * 60 * 72
 
 class SessionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
